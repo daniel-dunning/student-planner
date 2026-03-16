@@ -133,4 +133,4 @@ def get_calendar_events(
                 "status": "Completed" if t.is_completed else "Pending"
             }
         })
-    return events
+    return events  
