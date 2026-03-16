@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-blue-600 p-4 text-white shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">EduPlan 2026</h1>
+            <span class="bg-blue-700 px-3 py-1 rounded text-sm">User ID: {{ user.id }} ({{ user.role }})</span>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800">Hello, {{ user.username }}!</h2>
+            <p class="text-gray-600">Here is your schedule overview.</p>
+        </header>
+
+        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {% for task in tasks %}
+            <div class="bg-white rounded-xl shadow-md overflow-hidden border-l-4 
+                {% if not task.is_completed and task.due_datetime < now %} border-red-500 {% else %} border-blue-500 {% endif %}">
+                <div class="p-5">
+                    <div class="flex justify-between items-start">
+                        <span class="text-xs font-bold uppercase tracking-wider px-2 py-1 rounded 
+                            {% if task.priority == 'High' %} bg-red-100 text-red-700 {% else %} bg-gray-100 text-gray-700 {% endif %}">
+                            {{ task.priority }}
+                        </span>
+                        <span class="text-xs text-gray-500">{{ task.category }}</span>
+                    </div>
+                    
+                    <h3 class="text-lg font-bold mt-2 {% if task.is_completed %} line-through text-gray-400 {% endif %}">
+                        {{ task.title }}
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-1">{{ task.description or "No description." }}</p>
+                    
+                    <div class="mt-4 flex items-center text-sm text-gray-500">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Due: {{ task.due_datetime.strftime('%b %d, %H:%M') }}
+                    </div>
+
+                    {% if not task.is_completed %}
+                    <form action="/tasks/{{ task.id }}/complete" method="post" class="mt-4">
+                        <input type="hidden" name="x_user_id" value="{{ user.id }}">
+                        <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition">
+                            Mark Complete
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="mt-4 text-center text-green-600 font-medium text-sm">
+                        ✓ Completed at {{ task.actual_completed_at.strftime('%H:%M') }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+</body>
+</html>
