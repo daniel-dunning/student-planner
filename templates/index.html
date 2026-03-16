@@ -3,56 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Planner</title>
+    <title>Student Planner Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <nav class="bg-blue-600 p-4 text-white shadow-lg">
+    <nav class="bg-blue-700 p-4 text-white shadow-md">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold">EduPlan 2026</h1>
-            <span class="bg-blue-700 px-3 py-1 rounded text-sm">User ID: {{ user.id }} ({{ user.role }})</span>
+            <h1 class="text-xl font-bold tracking-tight">Student Planner 2026</h1>
+            <div class="flex items-center gap-4">
+                <span class="text-sm opacity-80 italic">{{ user.username }} ({{ user.role }})</span>
+                <a href="/logout" class="bg-red-500 hover:bg-red-600 text-xs font-bold py-1 px-3 rounded transition">Logout</a>
+            </div>
         </div>
     </nav>
 
-    <main class="container mx-auto p-4 md:p-8">
-        <header class="mb-8">
-            <h2 class="text-2xl font-semibold text-gray-800">Hello, {{ user.username }}!</h2>
-            <p class="text-gray-600">Here is your schedule overview.</p>
-        </header>
+    <main class="container mx-auto p-6">
+        {% if request.query_params.get('msg') %}
+        <div class="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 font-bold">{{ request.query_params.get('msg') }}</div>
+        {% endif %}
+        {% if user.role == 'admin' %}
+        <div class="grid md:grid-cols-2 gap-6 mb-10">
+            <div class="bg-white p-6 rounded-xl shadow border-t-4 border-blue-500">
+                <h3 class="font-bold text-lg mb-4">Manage Students</h3>
+                <form action="/admin/add_user" method="post" class="space-y-3">
+                    <input type="text" name="username" placeholder="Student Username" class="w-full border p-2 rounded" required>
+                    <input type="password" name="password" placeholder="Temporary Password" class="w-full border p-2 rounded" required>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded font-semibold">Add Student</button>
+                </form>
+            </div>
 
-        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div class="bg-white p-6 rounded-xl shadow border-t-4 border-green-500">
+                <h3 class="font-bold text-lg mb-4">Assign New Task</h3>
+                <form action="/admin/assign_task" method="post" class="space-y-3">
+                    <input type="text" name="title" placeholder="Task Title (e.g. Math Quiz)" class="w-full border p-2 rounded" required>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select name="student_id" class="border p-2 rounded" required>
+                            <option value="" disabled selected>Select Student</option>
+                            {% for s in students %}
+                            <option value="{{ s.id }}">{{ s.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="priority" class="border p-2 rounded">
+                            <option value="High">High</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="datetime-local" name="due_date" class="border p-2 rounded" required>
+                        <input type="text" name="category" placeholder="Category (e.g. Chores)" class="border p-2 rounded">
+                    </div>
+                    <button type="submit" class="w-full bg-green-600 text-white py-2 rounded font-semibold">Assign Task</button>
+                </form>
+            </div>
+        </div>
+        <hr class="mb-10">
+        {% endif %}
+
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Schedule Items</h2>
+        <div class="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {% for task in tasks %}
-            <div class="bg-white rounded-xl shadow-md overflow-hidden border-l-4 
-                {% if not task.is_completed and task.due_datetime < now %} border-red-500 {% else %} border-blue-500 {% endif %}">
+            <div class="bg-white rounded-xl shadow-sm border-l-4 overflow-hidden 
+                {% if not task.is_completed and task.due_datetime < now %} border-red-500 bg-red-50 
+                {% elif task.is_completed %} border-gray-300 bg-gray-50 
+                {% else %} border-blue-400 {% endif %}">
+                
                 <div class="p-5">
-                    <div class="flex justify-between items-start">
-                        <span class="text-xs font-bold uppercase tracking-wider px-2 py-1 rounded 
-                            {% if task.priority == 'High' %} bg-red-100 text-red-700 {% else %} bg-gray-100 text-gray-700 {% endif %}">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full 
+                            {% if task.priority == 'High' %} bg-red-200 text-red-800 {% else %} bg-blue-100 text-blue-800 {% endif %}">
                             {{ task.priority }}
                         </span>
-                        <span class="text-xs text-gray-500">{{ task.category }}</span>
+                        {% if user.role == 'admin' %}
+                        <span class="text-xs font-bold text-blue-600">Assignee: {{ task.owner.username|title }}</span>
+                        {% endif %}
                     </div>
-                    
-                    <h3 class="text-lg font-bold mt-2 {% if task.is_completed %} line-through text-gray-400 {% endif %}">
+
+                    <h3 class="text-lg font-bold {% if task.is_completed %} line-through text-gray-400 {% endif %}">
                         {{ task.title }}
                     </h3>
-                    <p class="text-gray-600 text-sm mt-1">{{ task.description or "No description." }}</p>
                     
-                    <div class="mt-4 flex items-center text-sm text-gray-500">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Due: {{ task.due_datetime.strftime('%b %d, %H:%M') }}
+                    <div class="mt-4 text-xs text-gray-500 flex justify-between">
+                        <span>Due: {{ task.due_datetime.strftime('%m/%d %H:%M') }}</span>
+                        <span class="font-bold">{{ task.category }}</span>
                     </div>
 
                     {% if not task.is_completed %}
                     <form action="/tasks/{{ task.id }}/complete" method="post" class="mt-4">
                         <input type="hidden" name="x_user_id" value="{{ user.id }}">
-                        <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition">
+                        <button type="submit" class="w-full bg-white border-2 border-green-500 text-green-600 hover:bg-green-500 hover:text-white font-bold py-2 px-4 rounded transition-all">
                             Mark Complete
                         </button>
                     </form>
                     {% else %}
-                    <div class="mt-4 text-center text-green-600 font-medium text-sm">
-                        ✓ Completed at {{ task.actual_completed_at.strftime('%H:%M') }}
+                    <div class="mt-4 text-center text-green-600 text-sm font-bold bg-green-100 py-1 rounded">
+                        ✓ Done at {{ task.actual_completed_at.strftime('%H:%M') }}
                     </div>
                     {% endif %}
                 </div>
@@ -61,4 +106,57 @@
         </div>
     </main>
 </body>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">Your Schedule</h2>
+    <div class="inline-flex rounded-md shadow-sm" role="group">
+        <button onclick="toggleView('list')" class="px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100">List</button>
+        <button onclick="toggleView('calendar')" class="px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-r-lg hover:bg-gray-100">Calendar</button>
+    </div>
+</div>
+
+<div id="calendar-container" class="hidden bg-white p-4 rounded-xl shadow mb-10">
+    <div id="calendar"></div>
+</div>
+
+<div id="list-view" class="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+    </div>
+
+<script>
+    let calendar;
+
+    function toggleView(view) {
+        const list = document.getElementById('list-view');
+        const calContainer = document.getElementById('calendar-container');
+        
+        if (view === 'calendar') {
+            list.classList.add('hidden');
+            calContainer.classList.remove('hidden');
+            if (!calendar) {
+                initCalendar();
+            }
+            calendar.render();
+        } else {
+            list.classList.remove('hidden');
+            calContainer.classList.add('hidden');
+        }
+    }
+
+    function initCalendar() {
+        const calendarEl = document.getElementById('calendar');
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth', // Options: timeGridDay, timeGridWeek
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            events: '/api/calendar-events',
+            eventClick: function(info) {
+                alert('Task: ' + info.event.title + '\nStatus: ' + info.event.extendedProps.status);
+            }
+        });
+    }
+</script>
 </html>
