@@ -8,6 +8,7 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     password = Column(String) 
     role = Column(String)     # "admin" or "student"
+    requires_password_change = Column(Boolean, default=False)
     tasks = relationship("Task", back_populates="owner")
 
 class Task(Base):

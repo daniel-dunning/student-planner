@@ -32,9 +32,18 @@ def login_page(request: Request):
 
 @app.post("/login")
 def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.username == username, models.User.password == password).first()
+    user = db.query(models.User).filter(models.User.username == username).first()
     if not user:
+        user = db.query(models.User).filter(models.User.username == username.lower()).first()
+    
+    if not user or not auth_utils.verify_password(password, user.password):
         return RedirectResponse(url="/?error=Invalid", status_code=303)
+        
+    if user.requires_password_change:
+        response = RedirectResponse(url="/reset_password", status_code=303)
+        response.set_cookie(key="pending_user_id", value=str(user.id))
+        return response
+
     response = RedirectResponse(url="/dashboard", status_code=303)
     response.set_cookie(key="user_id", value=str(user.id))
     return response
@@ -43,6 +52,33 @@ def login(username: str = Form(...), password: str = Form(...), db: Session = De
 def logout():
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("user_id")
+    return response
+
+@app.get("/reset_password", response_class=HTMLResponse)
+def reset_password_page(request: Request):
+    return templates.TemplateResponse("reset_password.html", {"request": request})
+
+@app.post("/reset_password")
+def execute_password_reset(
+    request: Request,
+    new_password: str = Form(...),
+    db: Session = Depends(database.get_db)
+):
+    pending_user_id = request.cookies.get("pending_user_id")
+    if not pending_user_id:
+        return RedirectResponse(url="/", status_code=303)
+        
+    user = db.query(models.User).filter(models.User.id == int(pending_user_id)).first()
+    if not user:
+        return RedirectResponse(url="/", status_code=303)
+        
+    user.password = auth_utils.get_password_hash(new_password)
+    user.requires_password_change = False
+    db.commit()
+    
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.set_cookie(key="user_id", value=str(user.id))
+    response.delete_cookie("pending_user_id")
     return response
 
 # --- TASK & USER MANAGEMENT ---
@@ -54,9 +90,11 @@ def dashboard(request: Request, user: models.User = Depends(get_session_user), d
     # RBAC Task Filtering
     if user.role == "admin":
         tasks = db.query(models.Task).order_by(models.Task.due_datetime.asc()).all()
-        students = db.query(models.User).filter(models.User.role == "student").all()
+        all_users = db.query(models.User).order_by(models.User.username.asc()).all()
+        students = [u for u in all_users if u.role == "student"]
     else:
         tasks = db.query(models.Task).filter(models.Task.owner_id == user.id).order_by(models.Task.due_datetime.asc()).all()
+        all_users = []
         students = []
     
     flash = request.cookies.get("flash")
@@ -65,6 +103,7 @@ def dashboard(request: Request, user: models.User = Depends(get_session_user), d
         "tasks": tasks,
         "user": user,
         "students": students,
+        "all_users": all_users,
         "now": datetime.now(),
         "flash": flash,
         "categories": validate_categories
@@ -205,6 +244,27 @@ def edit_task(
     return _flash_redirect("Task updated")
 
 
+@app.post("/tasks/{task_id}/complete")
+def complete_task(
+    task_id: int,
+    user: models.User = Depends(get_session_user),
+    db: Session = Depends(database.get_db)
+):
+    if not user:
+        return RedirectResponse(url="/", status_code=303)
+
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        return _flash_redirect("Task not found")
+
+    if user.role != "admin" and task.owner_id != user.id:
+        raise HTTPException(status_code=403)
+
+    task.is_completed = True
+    task.actual_completed_at = datetime.now()
+    db.commit()
+    return _flash_redirect("Task completed")
+
 @app.post("/tasks/{task_id}/delete")
 def delete_task(
     task_id: int,
@@ -226,21 +286,71 @@ def delete_task(
     db.commit()
     return _flash_redirect("Task deleted")
 
-@app.post("/admin/add_user")
-def add_user(username: str = Form(...), password: str = Form(...), user: models.User = Depends(get_session_user), db: Session = Depends(database.get_db)):
+@app.post("/admin/users/add")
+def add_user(username: str = Form(...), password: str = Form(...), role: str = Form(...), user: models.User = Depends(get_session_user), db: Session = Depends(database.get_db)):
     if not user or user.role != "admin":
         raise HTTPException(status_code=403)
-    # Store usernames as lowercase to keep DB canonicalization
     uname = username.lower()
-    # If a user with the same canonical username exists, flash a message
     existing = db.query(models.User).filter(models.User.username == uname).first()
     if existing:
         return _flash_redirect("User already exists")
 
-    new_user = models.User(username=uname, password=password, role="student")
+    hashed_pwd = auth_utils.get_password_hash(password)
+    new_user = models.User(username=uname, password=hashed_pwd, role=role)
     db.add(new_user)
     db.commit()
     return _flash_redirect("User added")
+
+@app.post("/admin/users/{target_user_id}/edit")
+def edit_user(
+    target_user_id: int,
+    username: str = Form(...),
+    role: str = Form(...),
+    user: models.User = Depends(get_session_user),
+    db: Session = Depends(database.get_db)
+):
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403)
+        
+    target_user = db.query(models.User).filter(models.User.id == target_user_id).first()
+    if target_user:
+        target_user.username = username.lower()
+        target_user.role = role
+        db.commit()
+    return _flash_redirect("User updated successfully.")
+
+@app.post("/admin/users/{target_user_id}/delete")
+def delete_user(
+    target_user_id: int,
+    user: models.User = Depends(get_session_user),
+    db: Session = Depends(database.get_db)
+):
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403)
+    if user.id == target_user_id:
+        return _flash_redirect("You cannot delete your own account.")
+        
+    target_user = db.query(models.User).filter(models.User.id == target_user_id).first()
+    if target_user:
+        db.delete(target_user)
+        db.commit()
+    return _flash_redirect("User deleted successfully.")
+
+@app.post("/admin/users/{target_user_id}/force_password_change")
+def force_password_change(
+    target_user_id: int,
+    user: models.User = Depends(get_session_user),
+    db: Session = Depends(database.get_db)
+):
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403)
+        
+    target_user = db.query(models.User).filter(models.User.id == target_user_id).first()
+    if target_user:
+        target_user.requires_password_change = True
+        db.commit()
+        return _flash_redirect(f"User {target_user.username} will be required to change their password on next login.")
+    return _flash_redirect("User not found.")
 
 @app.get("/api/calendar-events")
 def get_calendar_events(
