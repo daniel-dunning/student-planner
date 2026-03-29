@@ -8,10 +8,14 @@ WORKDIR /app
 RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 
+EXPOSE 8111
+
 COPY requirements.txt .
+
+RUN pip install uv
 
 RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8111"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8111"]
