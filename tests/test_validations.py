@@ -56,7 +56,7 @@ def create_user(db, username, password, role):
 def test_create_task_invalid_category(client):
     # prepare DB and user
     db = next(database.get_db())
-    student = create_user(db, "s1", "pass", "student")
+    student = create_user(db, "s1", "pass", "user")
 
     # login by setting cookie on the TestClient
     client.cookies.set("user_id", str(student.id))
@@ -80,7 +80,7 @@ def test_create_task_invalid_category(client):
 
 def test_create_task_valid_category_creates_task(client):
     db = next(database.get_db())
-    student = create_user(db, "s2", "pass", "student")
+    student = create_user(db, "s2", "pass", "user")
     client.cookies.set("user_id", str(student.id))
 
     resp = client.post(
@@ -106,7 +106,7 @@ def test_create_task_valid_category_creates_task(client):
 
 def test_edit_task_invalid_category(client):
     db = next(database.get_db())
-    student = create_user(db, "s3", "pass", "student")
+    student = create_user(db, "s3", "pass", "user")
     # create a valid task
     due_dt = datetime.strptime("2099-01-03T12:00", "%Y-%m-%dT%H:%M")
     task = models.Task(title="T1", description="d", due_datetime=due_dt, priority="Medium", category="Chores", owner_id=student.id)
@@ -133,7 +133,7 @@ def test_edit_task_invalid_category(client):
 def test_admin_assign_task_category_validation(client):
     db = next(database.get_db())
     admin = create_user(db, "admin_test", "a", "admin")
-    student = create_user(db, "s_student", "p", "student")
+    student = create_user(db, "s_student", "p", "user")
 
     client.cookies.set("user_id", str(admin.id))
 
@@ -142,7 +142,7 @@ def test_admin_assign_task_category_validation(client):
         "/admin/assign_task",
         data={
             "title": "AdminBad",
-            "student_id": student.id,
+            "target_user_id": student.id,
             "due_date": "2099-02-01T09:00",
             "priority": "High",
             "category": "Nope",
@@ -156,7 +156,7 @@ def test_admin_assign_task_category_validation(client):
         "/admin/assign_task",
         data={
             "title": "AdminOk",
-            "student_id": student.id,
+            "target_user_id": student.id,
             "due_date": "2099-02-02T09:00",
             "priority": "High",
             "category": "Exam",

@@ -25,10 +25,10 @@ def client():
         yield c
 
 
-def test_student_create_edit_delete_flow(client):
+def test_user_create_edit_delete_flow(client):
     # Create a student directly in the test DB
     db = database.SessionLocal()
-    student = models.User(username="stu_test", password="p", role="student")
+    student = models.User(username="stu_test", password="p", role="user")
     db.add(student)
     db.commit()
     db.refresh(student)

@@ -105,11 +105,11 @@ def dashboard(
             except ValueError:
                 pass
         all_users = db.query(models.User).order_by(models.User.username.asc()).all()
-        students = [u for u in all_users if u.role == "student"]
+        regular_users = [u for u in all_users if u.role == "user"]
     else:
         query = query.filter(models.Task.owner_id == user.id)
         all_users = []
-        students = []
+        regular_users = []
 
     if is_completed == "true":
         query = query.filter(models.Task.is_completed == True)
@@ -134,7 +134,7 @@ def dashboard(
         "request": request,
         "tasks": tasks,
         "user": user,
-        "students": students,
+        "regular_users": regular_users,
         "all_users": all_users,
         "now": datetime.now(),
         "flash": flash,
@@ -148,7 +148,7 @@ def dashboard(
 @app.post("/admin/assign_task")
 def assign_task(
     title: str = Form(...), 
-    student_id: int = Form(...), 
+    target_user_id: int = Form(...), 
     due_date: str = Form(...), 
     priority: str = Form(...),
     category: str = Form(...),
@@ -169,7 +169,7 @@ def assign_task(
     new_task = models.Task(
         title=title, 
         description=description,
-        owner_id=student_id, 
+        owner_id=target_user_id, 
         due_datetime=due_dt, 
         priority=priority, 
         category=category
@@ -189,10 +189,10 @@ def create_task(
     user: models.User = Depends(get_session_user),
     db: Session = Depends(database.get_db)
 ):
-    # Only logged-in students may create their own tasks
+    # Only logged-in users may create their own tasks
     if not user:
         return RedirectResponse(url="/", status_code=303)
-    if user.role != "student":
+    if user.role != "user":
         raise HTTPException(status_code=403)
 
     # Validate priority
