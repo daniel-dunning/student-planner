@@ -13,4 +13,19 @@ def require_role(roles: list):
         if user.role not in roles:
             raise HTTPException(status_code=403, detail="Permission denied")
         return user
-    return role_checker
+import bcrypt
+
+def verify_password(plain_password, hashed_password):
+    try:
+        if isinstance(hashed_password, str):
+            hashed_password = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
+    except ValueError:
+        # In case the database holds an old plain-text password or an invalid format
+        # Decoded as best-effort for equality
+        decoded_hash = hashed_password.decode('utf-8') if isinstance(hashed_password, bytes) else hashed_password
+        return plain_password == decoded_hash
+
+def get_password_hash(password):
+    hashed_bytes = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed_bytes.decode('utf-8')

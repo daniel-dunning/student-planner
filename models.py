@@ -6,8 +6,9 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
-    password = Column(String) # In production, use hashed passwords
+    password = Column(String) 
     role = Column(String)     # "admin" or "student"
+    requires_password_change = Column(Boolean, default=False)
     tasks = relationship("Task", back_populates="owner")
 
 class Task(Base):
@@ -16,10 +17,14 @@ class Task(Base):
     title = Column(String)
     description = Column(String)
     due_datetime = Column(DateTime)
-    planned_start = Column(DateTime, nullable=True)
-    actual_completed_at = Column(DateTime, nullable=True)
     is_completed = Column(Boolean, default=False)
+    actual_completed_at = Column(DateTime, nullable=True)
     priority = Column(String)
     category = Column(String)
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="tasks")
+
+class Category(Base):
+    __tablename__ = "categories"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
