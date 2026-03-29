@@ -207,6 +207,7 @@
                             <option value="all" {% if request.query_params.get('is_completed') == 'all' %}selected{% endif %}>All</option>
                             <option value="false" {% if request.query_params.get('is_completed') == 'false' %}selected{% endif %}>Pending</option>
                             <option value="true" {% if request.query_params.get('is_completed') == 'true' %}selected{% endif %}>Completed</option>
+                            <option value="overdue" {% if request.query_params.get('is_completed') == 'overdue' %}selected{% endif %}>Overdue</option>
                         </select>
                     </div>
                     <div>
@@ -383,7 +384,7 @@
                     </thead>
                     <tbody>
                         {% for task in tasks %}
-                        <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 {% if not task.is_completed and task.due_datetime < now %}bg-red-50/50{% elif task.is_completed %}bg-slate-50 opacity-75{% endif %}">
+                        <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 {% if not task.is_completed and task.due_datetime < now %}bg-red-100 hover:bg-red-200{% elif task.is_completed %}bg-slate-50 opacity-75{% endif %}">
                             <td class="p-3 text-center w-12">
                                 {% if task.is_completed %}
                                 <span class="text-green-600 font-bold" title="Completed {% if task.actual_completed_at %}at {{ task.actual_completed_at.strftime('%H:%M') }}{% endif %}">✓</span>
@@ -393,7 +394,14 @@
                                 <span class="text-slate-400">-</span>
                                 {% endif %}
                             </td>
-                            <td class="p-3 font-medium {% if task.is_completed %}text-slate-500 line-through{% endif %}">{{ task.title }}</td>
+                            <td class="p-3">
+                                <span class="font-medium {% if task.is_completed %}text-slate-500 line-through{% endif %}">{{ task.title }}</span>
+                                {% if not task.is_completed and task.due_datetime < now %}
+                                <span class="ml-2 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-red-600 text-white shadow-sm shadow-red-500/50">
+                                    OVERDUE
+                                </span>
+                                {% endif %}
+                            </td>
                             <td class="p-3">
                                 <span class="rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest
                                     {% if task.priority == 'High' %} bg-red-200 text-red-800

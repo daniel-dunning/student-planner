@@ -90,7 +90,7 @@ def dashboard(
     is_completed: Optional[str] = None,
     priority: Optional[str] = None,
     category: Optional[str] = None,
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     user: models.User = Depends(get_session_user),
     db: Session = Depends(database.get_db)
 ):
@@ -100,8 +100,11 @@ def dashboard(
     
     # RBAC Task Filtering
     if user.role == "admin":
-        if user_id:
-            query = query.filter(models.Task.owner_id == user_id)
+        if user_id and user_id.strip() != "":
+            try:
+                query = query.filter(models.Task.owner_id == int(user_id))
+            except ValueError:
+                pass
         all_users = db.query(models.User).order_by(models.User.username.asc()).all()
         students = [u for u in all_users if u.role == "student"]
     else:
@@ -113,6 +116,8 @@ def dashboard(
         query = query.filter(models.Task.is_completed == True)
     elif is_completed == "false":
         query = query.filter(models.Task.is_completed == False)
+    elif is_completed == "overdue":
+        query = query.filter(models.Task.is_completed == False, models.Task.due_datetime < datetime.now())
         
     if priority and priority != "all":
         query = query.filter(models.Task.priority == priority)
@@ -383,7 +388,7 @@ def get_calendar_events(
     is_completed: Optional[str] = None,
     priority: Optional[str] = None,
     category: Optional[str] = None,
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     user: models.User = Depends(get_session_user), 
     db: Session = Depends(database.get_db)
 ):
@@ -392,8 +397,11 @@ def get_calendar_events(
         
     query = db.query(models.Task)
     if user.role == "admin":
-        if user_id:
-            query = query.filter(models.Task.owner_id == user_id)
+        if user_id and user_id.strip() != "":
+            try:
+                query = query.filter(models.Task.owner_id == int(user_id))
+            except ValueError:
+                pass
     else:
         query = query.filter(models.Task.owner_id == user.id)
         
@@ -401,6 +409,8 @@ def get_calendar_events(
         query = query.filter(models.Task.is_completed == True)
     elif is_completed == "false":
         query = query.filter(models.Task.is_completed == False)
+    elif is_completed == "overdue":
+        query = query.filter(models.Task.is_completed == False, models.Task.due_datetime < datetime.now())
         
     if priority and priority != "all":
         query = query.filter(models.Task.priority == priority)
