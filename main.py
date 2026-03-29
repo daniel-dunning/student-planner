@@ -9,8 +9,7 @@ import models, database, auth_utils
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# Allowed categories for tasks (used in forms and validation)
-validate_categories = ["Homework", "Chores", "Exam", "Project", "Other"]
+
 
 
 def _flash_redirect(message: str, url: str = "/dashboard"):
@@ -127,6 +126,9 @@ def dashboard(
         
     tasks = query.order_by(models.Task.due_datetime.asc()).all()
     
+    categories_obj = db.query(models.Category).order_by(models.Category.name.asc()).all()
+    categories = [c.name for c in categories_obj]
+    
     flash = request.cookies.get("flash")
     response = templates.TemplateResponse("index.html", {
         "request": request,
@@ -136,7 +138,8 @@ def dashboard(
         "all_users": all_users,
         "now": datetime.now(),
         "flash": flash,
-        "categories": validate_categories
+        "categories": categories,
+        "categories_obj": categories_obj
     })
     if flash:
         response.delete_cookie("flash")
@@ -157,8 +160,9 @@ def assign_task(
     
     # Convert string from HTML datetime-local input to Python object
     due_dt = datetime.strptime(due_date, "%Y-%m-%dT%H:%M")
-    # Validate category against allowed list
-    if category not in validate_categories:
+    # Validate category against DB
+    valid_categories = [c.name for c in db.query(models.Category).all()]
+    if category not in valid_categories:
         return _flash_redirect("Invalid category")
     
     new_task = models.Task(
@@ -195,7 +199,8 @@ def create_task(
         return _flash_redirect("Invalid priority")
 
     # Validate category
-    if category not in validate_categories:
+    valid_categories = [c.name for c in db.query(models.Category).all()]
+    if category not in valid_categories:
         return _flash_redirect("Invalid category")
 
 
@@ -252,7 +257,8 @@ def edit_task(
     if priority not in allowed_priorities:
         return _flash_redirect("Invalid priority")
     # Validate category
-    if category not in validate_categories:
+    valid_categories = [c.name for c in db.query(models.Category).all()]
+    if category not in valid_categories:
         return _flash_redirect("Invalid category")
 
 
@@ -440,3 +446,24 @@ def get_calendar_events(
             }
         })
     return events  
+
+@app.post("/admin/categories/add")
+def add_category(name: str = Form(...), user: models.User = Depends(get_session_user), db: Session = Depends(database.get_db)):
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403)
+    existing = db.query(models.Category).filter(models.Category.name == name).first()
+    if existing:
+        return _flash_redirect("Category already exists")
+    db.add(models.Category(name=name))
+    db.commit()
+    return _flash_redirect("Category added")
+
+@app.post("/admin/categories/{category_id}/delete")
+def delete_category(category_id: int, user: models.User = Depends(get_session_user), db: Session = Depends(database.get_db)):
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403)
+    category = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if category:
+        db.delete(category)
+        db.commit()
+    return _flash_redirect("Category deleted")
