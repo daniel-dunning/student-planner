@@ -152,6 +152,7 @@ def assign_task(
     due_date: str = Form(...), 
     priority: str = Form(...),
     category: str = Form(...),
+    description: str = Form(""),
     user: models.User = Depends(get_session_user), 
     db: Session = Depends(database.get_db)
 ):
@@ -167,6 +168,7 @@ def assign_task(
     
     new_task = models.Task(
         title=title, 
+        description=description,
         owner_id=student_id, 
         due_datetime=due_dt, 
         priority=priority, 
