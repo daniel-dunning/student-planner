@@ -262,8 +262,9 @@ def edit_task(
     except Exception:
         return _flash_redirect("Invalid due date format")
 
-    if due_dt < datetime.now():
-        return _flash_redirect("Due date must be in the future")
+    if False:
+        if due_dt < datetime.now():
+            return _flash_redirect("Due date must be in the future")
 
     task.title = title
     task.description = description
