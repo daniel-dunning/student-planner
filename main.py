@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, Form, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
+from typing import Optional
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -84,18 +85,42 @@ def execute_password_reset(
 # --- TASK & USER MANAGEMENT ---
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, user: models.User = Depends(get_session_user), db: Session = Depends(database.get_db)):
+def dashboard(
+    request: Request,
+    is_completed: Optional[str] = None,
+    priority: Optional[str] = None,
+    category: Optional[str] = None,
+    user_id: Optional[int] = None,
+    user: models.User = Depends(get_session_user),
+    db: Session = Depends(database.get_db)
+):
     if not user: return RedirectResponse(url="/", status_code=303)
+    
+    query = db.query(models.Task)
     
     # RBAC Task Filtering
     if user.role == "admin":
-        tasks = db.query(models.Task).order_by(models.Task.due_datetime.asc()).all()
+        if user_id:
+            query = query.filter(models.Task.owner_id == user_id)
         all_users = db.query(models.User).order_by(models.User.username.asc()).all()
         students = [u for u in all_users if u.role == "student"]
     else:
-        tasks = db.query(models.Task).filter(models.Task.owner_id == user.id).order_by(models.Task.due_datetime.asc()).all()
+        query = query.filter(models.Task.owner_id == user.id)
         all_users = []
         students = []
+
+    if is_completed == "true":
+        query = query.filter(models.Task.is_completed == True)
+    elif is_completed == "false":
+        query = query.filter(models.Task.is_completed == False)
+        
+    if priority and priority != "all":
+        query = query.filter(models.Task.priority == priority)
+        
+    if category and category != "all":
+        query = query.filter(models.Task.category == category)
+        
+    tasks = query.order_by(models.Task.due_datetime.asc()).all()
     
     flash = request.cookies.get("flash")
     response = templates.TemplateResponse("index.html", {
@@ -354,6 +379,11 @@ def force_password_change(
 
 @app.get("/api/calendar-events")
 def get_calendar_events(
+    request: Request,
+    is_completed: Optional[str] = None,
+    priority: Optional[str] = None,
+    category: Optional[str] = None,
+    user_id: Optional[int] = None,
     user: models.User = Depends(get_session_user), 
     db: Session = Depends(database.get_db)
 ):
@@ -361,8 +391,22 @@ def get_calendar_events(
         raise HTTPException(status_code=401)
         
     query = db.query(models.Task)
-    if user.role != "admin":
+    if user.role == "admin":
+        if user_id:
+            query = query.filter(models.Task.owner_id == user_id)
+    else:
         query = query.filter(models.Task.owner_id == user.id)
+        
+    if is_completed == "true":
+        query = query.filter(models.Task.is_completed == True)
+    elif is_completed == "false":
+        query = query.filter(models.Task.is_completed == False)
+        
+    if priority and priority != "all":
+        query = query.filter(models.Task.priority == priority)
+        
+    if category and category != "all":
+        query = query.filter(models.Task.category == category)
         
     tasks = query.all()
     events = []
